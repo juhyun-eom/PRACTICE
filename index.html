@@ -722,29 +722,130 @@ function readFileAsText(file){
   });
 }
 
+// Splits one CSV line into fields, respecting quoted fields that contain commas.
+function splitCsvLine(line){
+  const result = [];
+  let cur = "";
+  let inQuotes = false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(inQuotes){
+      if(ch === '"'){
+        if(line[i+1] === '"'){ cur += '"'; i++; }
+        else inQuotes = false;
+      } else cur += ch;
+    } else {
+      if(ch === '"') inQuotes = true;
+      else if(ch === ','){ result.push(cur); cur = ""; }
+      else cur += ch;
+    }
+  }
+  result.push(cur);
+  return result.map(s=>s.trim());
+}
+
+// Normalises common bank date formats (DD/MM/YYYY, DD-MM-YYYY, "1 Jul 2026", etc.) to YYYY-MM-DD.
+function normalizeDate(raw){
+  raw = (raw||"").trim();
+  let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if(m){
+    let day = m[1], month = m[2], year = m[3];
+    if(parseInt(month,10) > 12) { const tmp = day; day = month; month = tmp; } // handles MM/DD/YYYY files
+    return `${year}-${month.padStart(2,"0")}-${day.padStart(2,"0")}`;
+  }
+  const d = new Date(raw);
+  if(!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+  return raw;
+}
+
+// Strips currency symbols/commas and handles (12.50)-style negatives.
+function parseAmountStr(raw){
+  if(raw==null || raw==="") return NaN;
+  let s = raw.trim();
+  let neg = /^\(.*\)$/.test(s);
+  if(neg) s = s.slice(1,-1);
+  s = s.replace(/[^0-9.\-]/g,"");
+  let n = parseFloat(s);
+  if(neg) n = -Math.abs(n);
+  return n;
+}
+
+function findCol(header, names){
+  for(const name of names){ const idx = header.indexOf(name); if(idx!==-1) return idx; }
+  for(const name of names){ const idx = header.findIndex(h=>h.includes(name)); if(idx!==-1) return idx; }
+  return -1;
+}
+
+// Fallback for merchants our own keyword list doesn't recognise, using the bank's own category text if it provides one.
+const BANK_CATEGORY_MAP = {
+  "eating out":["discretionary","Eating out"],
+  "groceries":["essential","Grocery"],
+  "grocery":["essential","Grocery"],
+  "transport":["essential","Transportation"],
+  "bills":["essential","Bills"],
+  "entertainment":["discretionary","Culture"],
+  "shopping":["discretionary","Shopping"],
+};
+
 function parseCsvText(text){
   const lines = text.split(/\r?\n/).filter(l=>l.trim().length>0);
   if(lines.length<2) return null;
-  const header = lines[0].split(",").map(h=>h.trim().toLowerCase());
-  const dateIdx = header.findIndex(h=>h.includes("date"));
-  const merchantIdx = header.findIndex(h=>h.includes("merchant")||h.includes("description")||h.includes("name"));
-  const amountIdx = header.findIndex(h=>h.includes("amount")||h.includes("value"));
-  if(dateIdx===-1||merchantIdx===-1||amountIdx===-1) return null;
-  const rows = lines.slice(1).map(l=>l.split(","));
-  return rows.filter(r=>r.length>Math.max(dateIdx,merchantIdx,amountIdx)).map(r=>{
-    const amount = parseFloat(r[amountIdx].replace(/[^0-9.\-]/g,""));
-    const merchant = r[merchantIdx].trim();
-    const isIncome = amount<0 && /salary|payroll|income/i.test(merchant);
-    const guess = isIncome ? {category:"income",subcategory:"General"} : classify(merchant);
+  const header = splitCsvLine(lines[0]).map(h=>h.trim().toLowerCase());
+
+  const dateIdx = findCol(header, ["date","transaction date","started date","completed date","posting date"]);
+  const merchantIdx = findCol(header, ["merchant","name","description","payee","counterparty"]);
+  const amountIdx = findCol(header, ["amount","value"]);
+  const debitIdx = findCol(header, ["money out","debit","withdrawal","paid out"]);
+  const creditIdx = findCol(header, ["money in","credit","deposit","paid in"]);
+  const bankCatIdx = findCol(header, ["category"]);
+  const typeIdx = findCol(header, ["type"]);
+
+  if(dateIdx===-1 || merchantIdx===-1) return null;
+  if(amountIdx===-1 && debitIdx===-1 && creditIdx===-1) return null;
+
+  const rows = lines.slice(1).map(splitCsvLine);
+  return rows.filter(r=>r.length>=header.length-1 && r[dateIdx]).map(r=>{
+    // Natural bank convention: negative = money out (spend), positive = money in.
+    let signedAmount;
+    if(amountIdx!==-1 && r[amountIdx]){
+      signedAmount = parseAmountStr(r[amountIdx]);
+    } else {
+      const debit = debitIdx!==-1 && r[debitIdx] ? Math.abs(parseAmountStr(r[debitIdx])||0) : 0;
+      const credit = creditIdx!==-1 && r[creditIdx] ? Math.abs(parseAmountStr(r[creditIdx])||0) : 0;
+      signedAmount = credit>0 ? credit : -debit;
+    }
+    const merchant = (r[merchantIdx]||"Unknown").trim();
+    const bankCat = bankCatIdx!==-1 ? (r[bankCatIdx]||"").trim().toLowerCase() : "";
+    const type = typeIdx!==-1 ? (r[typeIdx]||"").trim().toLowerCase() : "";
+
+    const isSaving = bankCat.includes("saving") || type.includes("pot transfer") || /\bisa\b|\blisa\b|moneybox/i.test(merchant);
+    const isExcluded = !isSaving && (signedAmount>0 || bankCat.includes("transfer") || bankCat.includes("income") || type==="transfer" || type==="topup");
+
+    let category, subcategory;
+    if(isSaving){
+      category = "saving"; subcategory = "General";
+    } else if(isExcluded){
+      category = "income"; subcategory = "General";
+    } else {
+      const guess = classify(merchant);
+      if(guess.category==="flexible" && guess.subcategory==="General" && BANK_CATEGORY_MAP[bankCat]){
+        [category,subcategory] = BANK_CATEGORY_MAP[bankCat];
+      } else {
+        category = guess.category; subcategory = guess.subcategory;
+      }
+    }
+
     return {
-      date:r[dateIdx].trim(),
+      date: normalizeDate(r[dateIdx]),
       merchant,
-      amount: Math.abs(amount),
-      category: guess.category,
-      subcategory: guess.subcategory,
+      amount: Math.abs(signedAmount),
+      category,
+      subcategory,
       remark:""
     };
-  }).filter(t=>!isNaN(t.amount));
+  }).filter(t=>!isNaN(t.amount) && t.amount>0 && t.merchant);
 }
 
 document.getElementById("csvInput").addEventListener("change", async function(e){
