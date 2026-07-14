@@ -126,7 +126,7 @@
   section .desc{color:var(--muted);font-size:.85rem;margin:0 0 18px;}
 
   .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
-  .bar-row .name{width:120px;font-size:.85rem;font-weight:600;flex-shrink:0;}
+  .bar-row .name{width:120px;font-size:.85rem;font-weight:600;flex-shrink:0;display:flex;align-items:center;gap:4px;}
   .bar-track{flex:1;background:var(--pale-tint);border-radius:8px;height:22px;overflow:hidden;position:relative;}
   .bar-fill{height:100%;border-radius:8px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;color:#fff;font-size:.72rem;font-weight:700;min-width:36px;}
   .bar-row .amt{width:150px;text-align:right;font-size:.82rem;color:var(--muted);flex-shrink:0;}
@@ -135,6 +135,17 @@
     .bar-row .name{width:100%;margin-bottom:4px;}
     .bar-row .amt{width:100%;text-align:left;margin-top:4px;}
   }
+  .chevron{
+    background:none;border:none;cursor:pointer;color:var(--muted);font-size:.65rem;
+    width:14px;flex-shrink:0;padding:0;transition:transform .15s ease;
+  }
+  .chevron.open{transform:rotate(90deg);}
+  .chevron-spacer{display:inline-block;width:14px;flex-shrink:0;}
+  .sub-row{margin-left:26px;margin-bottom:10px;opacity:.85;}
+  .sub-row .name{width:96px;font-size:.78rem;font-weight:500;color:var(--muted);}
+  .sub-row .bar-track{height:16px;}
+  .sub-row .bar-fill{font-size:.68rem;}
+  .sub-row .amt{font-size:.76rem;width:130px;}
 
   .leak-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
   @media(max-width:700px){.leak-grid{grid-template-columns:1fr;}}
@@ -256,7 +267,7 @@
 
   <section>
     <h2>Spending by category</h2>
-    <p class="desc">Where your income actually goes, as a share of what you earn.</p>
+    <p class="desc">Where your income actually goes, as a share of what you earn. Click a category with an arrow to see the detail beneath it.</p>
     <div id="categoryBars"></div>
   </section>
 
@@ -281,7 +292,7 @@
     <p class="desc" id="txnCount">0 transactions in this range</p>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Amount</th><th>Remarks</th></tr></thead>
+        <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Subcategory</th><th>Amount</th><th>Remarks</th></tr></thead>
         <tbody id="txnBody"></tbody>
       </table>
     </div>
@@ -301,87 +312,94 @@ const CATS = {
   investment:{label:"Investment", color:"var(--investment)"}
 };
 
+const SUBCATS = {
+  essential:["Rent","Grocery","Transportation","Bills","Phone","Other"],
+  discretionary:["Shopping","Culture","Eating out","Subscription","Other"],
+  flexible:["General"],
+  wasteful:["General"],
+  saving:["General"],
+  investment:["General"]
+};
+
 const RULES = [
-  [/rent|mortgage/i,"essential"],
-  [/tesco|sainsbury|aldi|lidl|asda|waitrose|grocer|morrisons/i,"essential"],
-  [/tfl|uber(?!.*eats)|trainline|bus|petrol|shell|bp fuel|esso/i,"essential"],
-  [/energy|octopus|british gas|water|council tax|broadband|sim only|ee mobile|three mobile|vodafone|o2 /i,"essential"],
-  [/pharmacy|boots|dentist|gp surgery/i,"essential"],
-  [/gym|peloton|classpass/i,"flexible"],
-  [/netflix|spotify|disney|amazon prime|now tv|apple music|youtube premium|audible|icloud|hbo/i,"wasteful-sub"],
-  [/deliveroo|uber eats|just eat|takeaway/i,"discretionary"],
-  [/costa|starbucks|pret|coffee|cafe/i,"discretionary"],
-  [/pub|bar|wetherspoon|nightclub|cocktail/i,"discretionary"],
-  [/cinema|odeon|vue|theatre|concert|gig/i,"discretionary"],
-  [/asos|zara|h&m|shein|nike|next retail|clothing/i,"discretionary"],
-  [/restaurant|nando|wagamama|dining/i,"discretionary"],
-  [/savings pot|isa transfer|savings transfer/i,"saving"],
-  [/vanguard|trading 212|investment|pension|stocks/i,"investment"],
-  [/lottery|betting|bet365|gambling/i,"wasteful"],
-  [/atm|cash withdrawal/i,"flexible"],
+  [/rent|mortgage/i,"essential","Rent"],
+  [/tesco|sainsbury|aldi|lidl|asda|waitrose|grocer|morrisons/i,"essential","Grocery"],
+  [/tfl|uber(?!.*eats)|trainline|bus|petrol|shell|bp fuel|esso/i,"essential","Transportation"],
+  [/energy|octopus|british gas|water|council tax|broadband/i,"essential","Bills"],
+  [/sim only|ee mobile|three mobile|vodafone|o2 /i,"essential","Phone"],
+  [/pharmacy|boots|dentist|gp surgery/i,"essential","Other"],
+  [/gym|peloton|classpass/i,"flexible","General"],
+  [/netflix|spotify|disney|amazon prime|now tv|apple music|youtube premium|audible|icloud|hbo/i,"discretionary","Subscription"],
+  [/deliveroo|uber eats|just eat|takeaway|costa|starbucks|pret|coffee|cafe|pub|wetherspoon|nightclub|cocktail|restaurant|nando|wagamama|dining/i,"discretionary","Eating out"],
+  [/cinema|odeon|vue|theatre|concert|gig/i,"discretionary","Culture"],
+  [/asos|zara|h&m|shein|nike|next retail|clothing/i,"discretionary","Shopping"],
+  [/savings pot|isa transfer|savings transfer/i,"saving","General"],
+  [/vanguard|trading 212|investment|pension|stocks/i,"investment","General"],
+  [/lottery|betting|bet365|gambling/i,"wasteful","General"],
+  [/atm|cash withdrawal/i,"flexible","General"],
 ];
 
 function classify(merchant){
-  for(const [re,cat] of RULES){
-    if(re.test(merchant)) return cat==="wasteful-sub" ? "wasteful" : cat;
+  for(const [re,cat,sub] of RULES){
+    if(re.test(merchant)) return {category:cat, subcategory:sub};
   }
-  return "flexible";
+  return {category:"flexible", subcategory:"General"};
 }
 
 /* ---------- sample data (invented, realistic UK current-account export) ---------- */
 const SAMPLE_INCOME = 3200;
 const SAMPLE_TXNS = [
-  ["2026-06-01","Salary - Employer Ltd", -3200,"income"],
-  ["2026-06-01","Rent - Landlord",990,"essential"],
-  ["2026-06-02","Tesco Groceries",64.20,"essential"],
-  ["2026-06-02","TfL Travel",42.10,"essential"],
-  ["2026-06-03","Octopus Energy",88,"essential"],
-  ["2026-06-03","Council Tax",145,"essential"],
-  ["2026-06-03","Vodafone Mobile",28,"essential"],
-  ["2026-06-04","Netflix",15.99,"wasteful"],
-  ["2026-06-04","Spotify",11.99,"wasteful"],
-  ["2026-06-05","Costa Coffee",4.85,"discretionary"],
-  ["2026-06-05","Pret A Manger",7.40,"discretionary"],
-  ["2026-06-06","Deliveroo",23.50,"discretionary"],
-  ["2026-06-06","Sainsbury's Groceries",41.30,"essential"],
-  ["2026-06-07","Peloton App",12.99,"flexible"],
-  ["2026-06-08","Wetherspoon",26.00,"discretionary"],
-  ["2026-06-08","Uber",14.20,"flexible"],
-  ["2026-06-09","Amazon Prime",8.99,"wasteful"],
-  ["2026-06-09","Disney+",7.99,"wasteful"],
-  ["2026-06-10","Tesco Groceries",58.10,"essential"],
-  ["2026-06-10","Boots Pharmacy",12.40,"essential"],
-  ["2026-06-11","ASOS",54.00,"discretionary"],
-  ["2026-06-11","Starbucks",5.10,"discretionary"],
-  ["2026-06-12","Nando's",19.80,"discretionary"],
-  ["2026-06-12","Trading 212 Investment",250,"investment"],
-  ["2026-06-13","Savings Pot Transfer",300,"saving"],
-  ["2026-06-13","Cash Withdrawal",40,"flexible"],
-  ["2026-06-14","Gym Membership - PureGym",34.99,"flexible"],
-  ["2026-06-14","Just Eat",21.60,"discretionary"],
-  ["2026-06-15","Sainsbury's Groceries",49.70,"essential"],
-  ["2026-06-15","Shell Petrol",55.00,"essential"],
-  ["2026-06-16","iCloud Storage",2.49,"wasteful"],
-  ["2026-06-16","Audible",7.99,"wasteful"],
-  ["2026-06-17","Cocktail Bar",38.00,"discretionary"],
-  ["2026-06-18","Odeon Cinema",22.50,"discretionary"],
-  ["2026-06-18","Tesco Groceries",63.40,"essential"],
-  ["2026-06-19","Deliveroo",18.90,"discretionary"],
-  ["2026-06-20","Costa Coffee",4.85,"discretionary"],
-  ["2026-06-20","TfL Travel",42.10,"essential"],
-  ["2026-06-21","Now TV",9.99,"wasteful"],
-  ["2026-06-22","Zara",72.00,"discretionary"],
-  ["2026-06-22","Uber",11.40,"flexible"],
-  ["2026-06-23","Sainsbury's Groceries",45.60,"essential"],
-  ["2026-06-24","Pension Contribution",180,"investment"],
-  ["2026-06-24","EE Mobile SIM",10,"essential"],
-  ["2026-06-25","Wagamama",28.40,"discretionary"],
-  ["2026-06-26","Costa Coffee",4.85,"discretionary"],
-  ["2026-06-27","British Gas",42,"essential"],
-  ["2026-06-27","Cash Withdrawal",30,"flexible"],
-  ["2026-06-28","Tesco Groceries",52.90,"essential"],
-  ["2026-06-29","Bet365",25,"wasteful"],
-  ["2026-06-30","Classpass",29.99,"flexible"],
+  ["2026-06-01","Salary - Employer Ltd", -3200,"income","General"],
+  ["2026-06-01","Rent - Landlord",990,"essential","Rent"],
+  ["2026-06-02","Tesco Groceries",64.20,"essential","Grocery"],
+  ["2026-06-02","TfL Travel",42.10,"essential","Transportation"],
+  ["2026-06-03","Octopus Energy",88,"essential","Bills"],
+  ["2026-06-03","Council Tax",145,"essential","Bills"],
+  ["2026-06-03","Vodafone Mobile",28,"essential","Phone"],
+  ["2026-06-04","Netflix",15.99,"discretionary","Subscription"],
+  ["2026-06-04","Spotify",11.99,"discretionary","Subscription"],
+  ["2026-06-05","Costa Coffee",4.85,"discretionary","Eating out"],
+  ["2026-06-05","Pret A Manger",7.40,"discretionary","Eating out"],
+  ["2026-06-06","Deliveroo",23.50,"discretionary","Eating out"],
+  ["2026-06-06","Sainsbury's Groceries",41.30,"essential","Grocery"],
+  ["2026-06-07","Peloton App",12.99,"flexible","General"],
+  ["2026-06-08","Wetherspoon",26.00,"discretionary","Eating out"],
+  ["2026-06-08","Uber",14.20,"flexible","General"],
+  ["2026-06-09","Amazon Prime",8.99,"discretionary","Subscription"],
+  ["2026-06-09","Disney+",7.99,"discretionary","Subscription"],
+  ["2026-06-10","Tesco Groceries",58.10,"essential","Grocery"],
+  ["2026-06-10","Boots Pharmacy",12.40,"essential","Other"],
+  ["2026-06-11","ASOS",54.00,"discretionary","Shopping"],
+  ["2026-06-11","Starbucks",5.10,"discretionary","Eating out"],
+  ["2026-06-12","Nando's",19.80,"discretionary","Eating out"],
+  ["2026-06-12","Trading 212 Investment",250,"investment","General"],
+  ["2026-06-13","Savings Pot Transfer",300,"saving","General"],
+  ["2026-06-13","Cash Withdrawal",40,"flexible","General"],
+  ["2026-06-14","Gym Membership - PureGym",34.99,"flexible","General"],
+  ["2026-06-14","Just Eat",21.60,"discretionary","Eating out"],
+  ["2026-06-15","Sainsbury's Groceries",49.70,"essential","Grocery"],
+  ["2026-06-15","Shell Petrol",55.00,"essential","Transportation"],
+  ["2026-06-16","iCloud Storage",2.49,"discretionary","Subscription"],
+  ["2026-06-16","Audible",7.99,"discretionary","Subscription"],
+  ["2026-06-17","Cocktail Bar",38.00,"discretionary","Eating out"],
+  ["2026-06-18","Odeon Cinema",22.50,"discretionary","Culture"],
+  ["2026-06-18","Tesco Groceries",63.40,"essential","Grocery"],
+  ["2026-06-19","Deliveroo",18.90,"discretionary","Eating out"],
+  ["2026-06-20","Costa Coffee",4.85,"discretionary","Eating out"],
+  ["2026-06-20","TfL Travel",42.10,"essential","Transportation"],
+  ["2026-06-21","Now TV",9.99,"discretionary","Subscription"],
+  ["2026-06-22","Zara",72.00,"discretionary","Shopping"],
+  ["2026-06-22","Uber",11.40,"flexible","General"],
+  ["2026-06-23","Sainsbury's Groceries",45.60,"essential","Grocery"],
+  ["2026-06-24","Pension Contribution",180,"investment","General"],
+  ["2026-06-24","EE Mobile SIM",10,"essential","Phone"],
+  ["2026-06-25","Wagamama",28.40,"discretionary","Eating out"],
+  ["2026-06-26","Costa Coffee",4.85,"discretionary","Eating out"],
+  ["2026-06-27","British Gas",42,"essential","Bills"],
+  ["2026-06-27","Cash Withdrawal",30,"flexible","General"],
+  ["2026-06-28","Tesco Groceries",52.90,"essential","Grocery"],
+  ["2026-06-29","Bet365",25,"wasteful","General"],
+  ["2026-06-30","Classpass",29.99,"flexible","General"],
 ];
 
 let currentIncome = SAMPLE_INCOME;
@@ -391,9 +409,10 @@ let filterMonth = null;
 let filterWeek = null;
 let filterFrom = null;
 let filterTo = null;
+let expandedCats = new Set(["essential","discretionary"]);
 
 function loadSample(){
-  allTxns = SAMPLE_TXNS.map(([date,merchant,amount,cat],i)=>({id:i,date,merchant,amount,category:cat,remark:""}));
+  allTxns = SAMPLE_TXNS.map(([date,merchant,amount,cat,sub],i)=>({id:i,date,merchant,amount,category:cat,subcategory:sub,remark:""}));
   currentIncome = SAMPLE_INCOME;
 }
 
@@ -475,6 +494,14 @@ function buildFilterControls(){
   }
 }
 
+document.getElementById("categoryBars").addEventListener("click",function(e){
+  const chevron = e.target.closest(".chevron");
+  if(!chevron) return;
+  const cat = chevron.dataset.cat;
+  if(expandedCats.has(cat)) expandedCats.delete(cat); else expandedCats.add(cat);
+  renderAggregates(getFilteredTxns());
+});
+
 document.getElementById("filterTabs").addEventListener("click",function(e){
   const btn = e.target.closest(".filter-tab");
   if(!btn) return;
@@ -506,18 +533,38 @@ function renderAggregates(spendTxns){
   const maxPct = Math.max(...Object.values(byCat).map(v=>v/currentIncome*100), 1);
   Object.entries(byCat).sort((a,b)=>b[1]-a[1]).forEach(([cat,amt])=>{
     const pct = amt/currentIncome*100;
+    const hasSub = (SUBCATS[cat]||["General"]).length>1;
+    const isOpen = expandedCats.has(cat);
     const row = document.createElement("div");
     row.className = "bar-row";
     row.innerHTML = `
-      <div class="name">${CATS[cat].label}</div>
+      <div class="name">${hasSub?`<button class="chevron ${isOpen?"open":""}" data-cat="${cat}">▸</button>`:`<span class="chevron-spacer"></span>`}${CATS[cat].label}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${Math.max(pct/maxPct*100,4)}%;background:${CATS[cat].color}">${pct.toFixed(1)}%</div></div>
       <div class="amt">${fmt(amt)}</div>
     `;
     barsEl.appendChild(row);
+
+    if(hasSub && isOpen){
+      const subTotals = {};
+      spendTxns.filter(t=>t.category===cat).forEach(t=>{ subTotals[t.subcategory] = (subTotals[t.subcategory]||0) + t.amount; });
+      const subEntries = Object.entries(subTotals).sort((a,b)=>b[1]-a[1]);
+      const maxSubPct = Math.max(...subEntries.map(([,v])=>v/currentIncome*100), 1);
+      subEntries.forEach(([sub,samt])=>{
+        const spct = samt/currentIncome*100;
+        const subRow = document.createElement("div");
+        subRow.className = "bar-row sub-row";
+        subRow.innerHTML = `
+          <div class="name">${sub}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.max(spct/maxSubPct*100,6)}%;background:${CATS[cat].color}">${spct.toFixed(1)}%</div></div>
+          <div class="amt">${fmt(samt)}</div>
+        `;
+        barsEl.appendChild(subRow);
+      });
+    }
   });
 
   const leakCandidates = {};
-  spendTxns.filter(t=>t.category==="wasteful" || /membership|subscription|app|prime|music|tv|storage/i.test(t.merchant))
+  spendTxns.filter(t=>t.subcategory==="Subscription" || t.category==="wasteful")
     .forEach(t=>{ leakCandidates[t.merchant] = (leakCandidates[t.merchant]||0) + t.amount; });
   const leaks = Object.entries(leakCandidates).sort((a,b)=>b[1]-a[1]).slice(0,3);
   const leakGrid = document.getElementById("leakGrid");
@@ -554,7 +601,7 @@ function renderAggregates(spendTxns){
     cutTotal += save;
     cutList.innerHTML += cutRow("Order takeaway less often","Swap 1-2 orders for cooking in",save);
   }
-  const smallSubs = spendTxns.filter(t=>t.category==="wasteful" && t.amount<15).reduce((s,t)=>s+t.amount,0);
+  const smallSubs = spendTxns.filter(t=>t.subcategory==="Subscription").reduce((s,t)=>s+t.amount,0);
   if(smallSubs>0){
     cutTotal += smallSubs*0.5;
     cutList.innerHTML += cutRow("Review small subscriptions","Cancel 1-2 you rarely use (streaming, storage, apps)",smallSubs*0.5);
@@ -602,12 +649,37 @@ function renderTable(spendTxns){
       if(key===t.category) opt.selected = true;
       sel.appendChild(opt);
     });
+    tdCat.appendChild(sel);
+
+    const tdSub = document.createElement("td");
+    const subSel = document.createElement("select");
+    subSel.className = "cat-tag-select";
+    subSel.style.background = "var(--pale)";
+    subSel.style.color = "var(--ink)";
+    function fillSubOptions(){
+      subSel.innerHTML = "";
+      const options = SUBCATS[t.category] || ["General"];
+      if(!options.includes(t.subcategory)) t.subcategory = options[0];
+      options.forEach(sub=>{
+        const opt = document.createElement("option");
+        opt.value = sub; opt.textContent = sub;
+        if(sub===t.subcategory) opt.selected = true;
+        subSel.appendChild(opt);
+      });
+    }
+    fillSubOptions();
+    tdSub.appendChild(subSel);
+
     sel.addEventListener("change",()=>{
       t.category = sel.value;
       sel.style.background = CATS[t.category].color;
+      fillSubOptions();
       renderAggregates(getFilteredTxns());
     });
-    tdCat.appendChild(sel);
+    subSel.addEventListener("change",()=>{
+      t.subcategory = subSel.value;
+      renderAggregates(getFilteredTxns());
+    });
 
     const tdAmt = document.createElement("td");
     tdAmt.textContent = fmt(t.amount);
@@ -621,7 +693,7 @@ function renderTable(spendTxns){
     input.addEventListener("change",()=>{ t.remark = input.value; });
     tdRemark.appendChild(input);
 
-    tr.appendChild(tdDate); tr.appendChild(tdMerchant); tr.appendChild(tdCat); tr.appendChild(tdAmt); tr.appendChild(tdRemark);
+    tr.appendChild(tdDate); tr.appendChild(tdMerchant); tr.appendChild(tdCat); tr.appendChild(tdSub); tr.appendChild(tdAmt); tr.appendChild(tdRemark);
     tbody.appendChild(tr);
   });
   document.getElementById("txnCount").textContent = spendTxns.length + " transactions in this range";
@@ -661,12 +733,15 @@ document.getElementById("csvInput").addEventListener("change", function(e){
       const txns = rows.filter(r=>r.length>Math.max(dateIdx,merchantIdx,amountIdx)).map((r,i)=>{
         const amount = parseFloat(r[amountIdx].replace(/[^0-9.\-]/g,""));
         const merchant = r[merchantIdx].trim();
+        const isIncome = amount<0 && /salary|payroll|income/i.test(merchant);
+        const guess = isIncome ? {category:"income",subcategory:"General"} : classify(merchant);
         return {
           id:i,
           date:r[dateIdx].trim(),
           merchant,
           amount: Math.abs(amount),
-          category: amount<0 && /salary|payroll|income/i.test(merchant) ? "income" : classify(merchant),
+          category: guess.category,
+          subcategory: guess.subcategory,
           remark:""
         };
       }).filter(t=>!isNaN(t.amount));
