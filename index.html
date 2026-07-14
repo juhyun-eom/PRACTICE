@@ -6,24 +6,29 @@
 <title>Money Dashboard</title>
 <style>
   :root{
-    --bg:#f4f6f6;
+    --bg:#f4f6f4;
     --card:#ffffff;
-    --ink:#1f2d2c;
-    --muted:#66787a;
-    --line:#e4e9e9;
-    --teal:#0f766e;
-    --teal-light:#ccfbf1;
-    --accent:#14b8a6;
-    --warn:#e0793c;
-    --warn-light:#fdecdc;
-    --good:#2f9e6f;
+    --ink:#2f3e46;
+    --muted:#6b7d76;
+    --line:#e1e8e3;
 
-    --essential:#0f766e;
-    --flexible:#2f9ecf;
-    --discretionary:#8b6fd6;
-    --wasteful:#e0793c;
-    --saving:#2f9e6f;
-    --investment:#c9a635;
+    --darkest:#2f3e46;
+    --dark:#354f52;
+    --mid:#52796f;
+    --sage:#84a98c;
+    --pale:#cad2c5;
+    --pale-tint:#eef2ec;
+
+    --warn:#bb6b4c;
+    --warn-light:#f7e5dd;
+    --gold:#a98d4c;
+
+    --essential:#354f52;
+    --flexible:#52796f;
+    --discretionary:#84a98c;
+    --wasteful:#bb6b4c;
+    --saving:#2f3e46;
+    --investment:#a98d4c;
   }
   *{box-sizing:border-box;}
   body{
@@ -34,7 +39,7 @@
     padding-bottom:60px;
   }
   header{
-    background:linear-gradient(135deg,#0f766e,#134e4a);
+    background:linear-gradient(135deg,var(--dark),var(--darkest));
     color:#fff;
     padding:28px 20px 32px;
   }
@@ -53,14 +58,12 @@
     justify-content:space-between;
     gap:12px;
     flex-wrap:wrap;
-    margin-bottom:20px;
+    margin-bottom:16px;
   }
   .upload-bar .label{font-size:.85rem;color:var(--muted);}
-  .upload-bar input[type=file]{
-    font-size:.85rem;
-  }
+  .upload-bar input[type=file]{font-size:.85rem;}
   .btn{
-    background:var(--teal);
+    background:var(--mid);
     color:#fff;
     border:none;
     padding:9px 16px;
@@ -69,8 +72,31 @@
     cursor:pointer;
     font-weight:600;
   }
-  .btn:hover{background:#0c5e57;}
-  .btn.secondary{background:transparent;color:var(--teal);border:1px solid var(--teal);}
+  .btn:hover{background:var(--dark);}
+  .btn.secondary{background:transparent;color:var(--mid);border:1px solid var(--mid);}
+
+  .filter-bar{
+    background:var(--card);
+    border-radius:14px;
+    padding:14px 18px;
+    box-shadow:0 4px 16px rgba(0,0,0,.06);
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-bottom:20px;
+  }
+  .filter-tabs{display:flex;gap:6px;background:var(--pale-tint);padding:4px;border-radius:10px;}
+  .filter-tab{
+    border:none;background:transparent;padding:7px 14px;border-radius:8px;
+    font-size:.82rem;font-weight:600;color:var(--muted);cursor:pointer;
+  }
+  .filter-tab.active{background:var(--mid);color:#fff;}
+  #filterControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  #filterControls select, #filterControls input[type=date]{
+    padding:7px 10px;border-radius:8px;border:1px solid var(--line);font-size:.85rem;color:var(--ink);background:#fff;
+  }
+  .filter-range-label{font-size:.78rem;color:var(--muted);margin-left:auto;}
 
   .cards{
     display:grid;
@@ -101,7 +127,7 @@
 
   .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
   .bar-row .name{width:120px;font-size:.85rem;font-weight:600;flex-shrink:0;}
-  .bar-track{flex:1;background:#eef1f1;border-radius:8px;height:22px;overflow:hidden;position:relative;}
+  .bar-track{flex:1;background:var(--pale-tint);border-radius:8px;height:22px;overflow:hidden;position:relative;}
   .bar-fill{height:100%;border-radius:8px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;color:#fff;font-size:.72rem;font-weight:700;min-width:36px;}
   .bar-row .amt{width:150px;text-align:right;font-size:.82rem;color:var(--muted);flex-shrink:0;}
   @media(max-width:600px){
@@ -114,7 +140,7 @@
   @media(max-width:700px){.leak-grid{grid-template-columns:1fr;}}
   .leak-card{
     background:var(--warn-light);
-    border:1px solid #f4d9bd;
+    border:1px solid #eccab8;
     border-radius:12px;
     padding:14px;
   }
@@ -130,34 +156,47 @@
     align-items:center;
     justify-content:space-between;
     gap:10px;
-    background:var(--teal-light);
+    background:var(--pale-tint);
     border-radius:10px;
     padding:12px 14px;
   }
   .cut-item .txt{font-size:.9rem;}
   .cut-item .txt b{display:block;font-size:.95rem;}
-  .cut-item .save{font-weight:700;color:var(--teal);white-space:nowrap;font-size:.9rem;}
+  .cut-item .save{font-weight:700;color:var(--mid);white-space:nowrap;font-size:.9rem;}
   .total-save{
     margin-top:14px;
     padding-top:14px;
-    border-top:1px dashed #b9e3dd;
+    border-top:1px dashed var(--pale);
     display:flex;
     justify-content:space-between;
     font-weight:700;
   }
 
   table{width:100%;border-collapse:collapse;font-size:.82rem;}
-  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle;}
   th{color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;}
-  .cat-tag{
-    display:inline-block;
-    padding:2px 8px;
+  .cat-tag-select{
+    padding:3px 8px;
     border-radius:20px;
-    font-size:.7rem;
+    font-size:.72rem;
     font-weight:700;
     color:#fff;
+    border:none;
+    appearance:none;
+    -webkit-appearance:none;
+    cursor:pointer;
   }
-  .table-wrap{max-height:340px;overflow-y:auto;}
+  .remark-input{
+    width:100%;
+    min-width:100px;
+    padding:5px 8px;
+    border-radius:6px;
+    border:1px solid var(--line);
+    font-size:.78rem;
+    color:var(--ink);
+    background:#fbfcfb;
+  }
+  .table-wrap{max-height:380px;overflow-y:auto;}
   .note{font-size:.78rem;color:var(--muted);margin-top:10px;}
 </style>
 </head>
@@ -166,7 +205,7 @@
 <header>
   <div class="wrap">
     <h1>Your Money Dashboard</h1>
-    <p id="periodLabel">Sample month · overview of spending, leaks, and easy wins</p>
+    <p id="periodLabel">Sample data · overview of spending, leaks, and easy wins</p>
   </div>
 </header>
 
@@ -182,10 +221,21 @@
     </div>
   </div>
 
+  <div class="filter-bar">
+    <div class="filter-tabs" id="filterTabs">
+      <button class="filter-tab active" data-mode="month">Monthly</button>
+      <button class="filter-tab" data-mode="week">Weekly</button>
+      <button class="filter-tab" data-mode="custom">Custom</button>
+    </div>
+    <div id="filterControls"></div>
+    <div class="filter-range-label" id="filterRangeLabel"></div>
+  </div>
+
   <div class="cards">
     <div class="card">
       <div class="k">Monthly income</div>
       <div class="v" id="incomeVal">£0</div>
+      <div class="sub">baseline used for all views</div>
     </div>
     <div class="card">
       <div class="k">Total spent</div>
@@ -199,7 +249,7 @@
     </div>
     <div class="card">
       <div class="k">Painless savings found</div>
-      <div class="v" id="cutVal" style="color:var(--teal)">£0</div>
+      <div class="v" id="cutVal" style="color:var(--mid)">£0</div>
       <div class="sub">per month, no lifestyle hit</div>
     </div>
   </div>
@@ -228,14 +278,14 @@
 
   <section>
     <h2>All transactions</h2>
-    <p class="desc" id="txnCount">0 transactions this month</p>
+    <p class="desc" id="txnCount">0 transactions in this range</p>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Amount</th></tr></thead>
+        <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Amount</th><th>Remarks</th></tr></thead>
         <tbody id="txnBody"></tbody>
       </table>
     </div>
-    <p class="note">Categories are guessed automatically from the merchant name. This is a first pass, not financial advice.</p>
+    <p class="note">Change a category any time using the dropdown — the dashboard above updates instantly. Remarks are just for your own notes.</p>
   </section>
 
 </div>
@@ -251,7 +301,6 @@ const CATS = {
   investment:{label:"Investment", color:"var(--investment)"}
 };
 
-// keyword -> category, used to auto-classify merchant names
 const RULES = [
   [/rent|mortgage/i,"essential"],
   [/tesco|sainsbury|aldi|lidl|asda|waitrose|grocer|morrisons/i,"essential"],
@@ -336,14 +385,110 @@ const SAMPLE_TXNS = [
 ];
 
 let currentIncome = SAMPLE_INCOME;
-let currentTxns = SAMPLE_TXNS.map(([date,merchant,amount,cat])=>({date,merchant,amount,category:cat}));
+let allTxns = [];
+let filterMode = "month";
+let filterMonth = null;
+let filterWeek = null;
+let filterFrom = null;
+let filterTo = null;
+
+function loadSample(){
+  allTxns = SAMPLE_TXNS.map(([date,merchant,amount,cat],i)=>({id:i,date,merchant,amount,category:cat,remark:""}));
+  currentIncome = SAMPLE_INCOME;
+}
+
+/* ---------- date helpers ---------- */
+function monthKey(d){ return d.slice(0,7); } // YYYY-MM
+function weekStart(dateStr){
+  const d = new Date(dateStr+"T00:00:00");
+  const day = (d.getDay()+6)%7; // 0=Mon
+  d.setDate(d.getDate()-day);
+  return d.toISOString().slice(0,10);
+}
+function addDays(dateStr,n){
+  const d = new Date(dateStr+"T00:00:00");
+  d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
+
+function getFilteredTxns(){
+  const spendable = allTxns.filter(t=>t.category!=="income");
+  if(filterMode==="month"){
+    return spendable.filter(t=>monthKey(t.date)===filterMonth);
+  }
+  if(filterMode==="week"){
+    return spendable.filter(t=>weekStart(t.date)===filterWeek);
+  }
+  if(filterMode==="custom"){
+    return spendable.filter(t=>t.date>=filterFrom && t.date<=filterTo);
+  }
+  return spendable;
+}
+
+function buildFilterControls(){
+  const spendable = allTxns.filter(t=>t.category!=="income");
+  const el = document.getElementById("filterControls");
+  el.innerHTML = "";
+  if(spendable.length===0) return;
+
+  if(filterMode==="month"){
+    const months = [...new Set(spendable.map(t=>monthKey(t.date)))].sort();
+    if(!filterMonth || !months.includes(filterMonth)) filterMonth = months[months.length-1];
+    const sel = document.createElement("select");
+    sel.id = "monthSelect";
+    months.forEach(m=>{
+      const opt = document.createElement("option");
+      opt.value = m; opt.textContent = m;
+      if(m===filterMonth) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener("change",()=>{ filterMonth = sel.value; renderAll(); });
+    el.appendChild(sel);
+  }
+  else if(filterMode==="week"){
+    const weeks = [...new Set(spendable.map(t=>weekStart(t.date)))].sort();
+    if(!filterWeek || !weeks.includes(filterWeek)) filterWeek = weeks[weeks.length-1];
+    const sel = document.createElement("select");
+    sel.id = "weekSelect";
+    weeks.forEach(w=>{
+      const opt = document.createElement("option");
+      opt.value = w; opt.textContent = "Week of " + w + " – " + addDays(w,6);
+      if(w===filterWeek) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener("change",()=>{ filterWeek = sel.value; renderAll(); });
+    el.appendChild(sel);
+  }
+  else if(filterMode==="custom"){
+    const dates = spendable.map(t=>t.date).sort();
+    if(!filterFrom) filterFrom = dates[0];
+    if(!filterTo) filterTo = dates[dates.length-1];
+    const fromInput = document.createElement("input");
+    fromInput.type = "date"; fromInput.value = filterFrom;
+    fromInput.addEventListener("change",()=>{ filterFrom = fromInput.value; renderAll(); });
+    const toLabel = document.createElement("span");
+    toLabel.textContent = "to"; toLabel.style.fontSize = ".82rem"; toLabel.style.color = "var(--muted)";
+    const toInput = document.createElement("input");
+    toInput.type = "date"; toInput.value = filterTo;
+    toInput.addEventListener("change",()=>{ filterTo = toInput.value; renderAll(); });
+    el.appendChild(fromInput); el.appendChild(toLabel); el.appendChild(toInput);
+  }
+}
+
+document.getElementById("filterTabs").addEventListener("click",function(e){
+  const btn = e.target.closest(".filter-tab");
+  if(!btn) return;
+  filterMode = btn.dataset.mode;
+  document.querySelectorAll(".filter-tab").forEach(b=>b.classList.toggle("active",b===btn));
+  buildFilterControls();
+  renderAll();
+});
 
 /* ---------- rendering ---------- */
 const fmt = n => "£" + n.toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmt0 = n => "£" + Math.round(n).toLocaleString("en-GB");
 
-function render(){
-  const spendTxns = currentTxns.filter(t=>t.category!=="income");
+function renderAggregates(spendTxns){
   const totalSpend = spendTxns.reduce((s,t)=>s+t.amount,0);
   const saveInvest = spendTxns.filter(t=>t.category==="saving"||t.category==="investment").reduce((s,t)=>s+t.amount,0);
 
@@ -353,7 +498,6 @@ function render(){
   document.getElementById("saveVal").textContent = fmt0(saveInvest);
   document.getElementById("savePct").textContent = Math.round(saveInvest/currentIncome*100) + "% of income";
 
-  // category bars
   const byCat = {};
   Object.keys(CATS).forEach(c=>byCat[c]=0);
   spendTxns.forEach(t=>{ byCat[t.category] = (byCat[t.category]||0) + t.amount; });
@@ -372,12 +516,9 @@ function render(){
     barsEl.appendChild(row);
   });
 
-  // money leaks: recurring small charges (wasteful + flexible subs), grouped by merchant, sorted by monthly cost
   const leakCandidates = {};
   spendTxns.filter(t=>t.category==="wasteful" || /membership|subscription|app|prime|music|tv|storage/i.test(t.merchant))
-    .forEach(t=>{
-      leakCandidates[t.merchant] = (leakCandidates[t.merchant]||0) + t.amount;
-    });
+    .forEach(t=>{ leakCandidates[t.merchant] = (leakCandidates[t.merchant]||0) + t.amount; });
   const leaks = Object.entries(leakCandidates).sort((a,b)=>b[1]-a[1]).slice(0,3);
   const leakGrid = document.getElementById("leakGrid");
   leakGrid.innerHTML = "";
@@ -387,17 +528,16 @@ function render(){
     div.innerHTML = `
       <div class="rank">Leak #${i+1}</div>
       <div class="merchant">${merchant}</div>
-      <div class="meta">Recurring monthly charge</div>
-      <div class="cost">${fmt(amt)}/mo</div>
-      <div class="yearly">≈ ${fmt(amt*12)} a year</div>
+      <div class="meta">Recurring charge in this range</div>
+      <div class="cost">${fmt(amt)}</div>
+      <div class="yearly">≈ ${fmt(amt*12)} a year if monthly</div>
     `;
     leakGrid.appendChild(div);
   });
   if(leaks.length===0){
-    leakGrid.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">No obvious recurring leaks found in this data.</p>`;
+    leakGrid.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">No obvious recurring leaks found in this range.</p>`;
   }
 
-  // painless cuts: discretionary + wasteful items, suggest trimming ~40% of discretionary "extras" and dropping unused-looking subs
   const cutList = document.getElementById("cutList");
   cutList.innerHTML = "";
   let cutTotal = 0;
@@ -412,7 +552,7 @@ function render(){
   if(takeawaySpend>0){
     const save = takeawaySpend*0.4;
     cutTotal += save;
-    cutList.innerHTML += cutRow("Order takeaway less often","Swap 1-2 orders a month for cooking in",save);
+    cutList.innerHTML += cutRow("Order takeaway less often","Swap 1-2 orders for cooking in",save);
   }
   const smallSubs = spendTxns.filter(t=>t.category==="wasteful" && t.amount<15).reduce((s,t)=>s+t.amount,0);
   if(smallSubs>0){
@@ -423,33 +563,81 @@ function render(){
   if(barSpend>0){
     const save = barSpend*0.3;
     cutTotal += save;
-    cutList.innerHTML += cutRow("Trim one night out a month","Same social life, one fewer round of drinks out",save);
+    cutList.innerHTML += cutRow("Trim one night out","Same social life, one fewer round of drinks out",save);
+  }
+  if(cutTotal===0){
+    cutList.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">No easy cuts spotted in this range.</p>`;
   }
 
-  document.getElementById("cutTotal").textContent = fmt0(cutTotal) + "/mo";
+  document.getElementById("cutTotal").textContent = fmt0(cutTotal);
   document.getElementById("cutVal").textContent = fmt0(cutTotal);
-
-  // transactions table
-  const tbody = document.getElementById("txnBody");
-  tbody.innerHTML = "";
-  spendTxns.slice().sort((a,b)=>a.date<b.date?1:-1).forEach(t=>{
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${t.date}</td>
-      <td>${t.merchant}</td>
-      <td><span class="cat-tag" style="background:${CATS[t.category].color}">${CATS[t.category].label}</span></td>
-      <td>${fmt(t.amount)}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-  document.getElementById("txnCount").textContent = spendTxns.length + " transactions this month";
 }
 
 function cutRow(title,desc,save){
   return `<div class="cut-item">
       <div class="txt"><b>${title}</b>${desc}</div>
-      <div class="save">-${fmt0(save)}/mo</div>
+      <div class="save">-${fmt0(save)}</div>
     </div>`;
+}
+
+function renderTable(spendTxns){
+  const tbody = document.getElementById("txnBody");
+  tbody.innerHTML = "";
+  spendTxns.slice().sort((a,b)=>a.date<b.date?1:-1).forEach(t=>{
+    const tr = document.createElement("tr");
+
+    const tdDate = document.createElement("td");
+    tdDate.textContent = t.date;
+
+    const tdMerchant = document.createElement("td");
+    tdMerchant.textContent = t.merchant;
+
+    const tdCat = document.createElement("td");
+    const sel = document.createElement("select");
+    sel.className = "cat-tag-select";
+    sel.style.background = CATS[t.category].color;
+    Object.entries(CATS).forEach(([key,def])=>{
+      const opt = document.createElement("option");
+      opt.value = key; opt.textContent = def.label;
+      if(key===t.category) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener("change",()=>{
+      t.category = sel.value;
+      sel.style.background = CATS[t.category].color;
+      renderAggregates(getFilteredTxns());
+    });
+    tdCat.appendChild(sel);
+
+    const tdAmt = document.createElement("td");
+    tdAmt.textContent = fmt(t.amount);
+
+    const tdRemark = document.createElement("td");
+    const input = document.createElement("input");
+    input.className = "remark-input";
+    input.type = "text";
+    input.placeholder = "add a note…";
+    input.value = t.remark || "";
+    input.addEventListener("change",()=>{ t.remark = input.value; });
+    tdRemark.appendChild(input);
+
+    tr.appendChild(tdDate); tr.appendChild(tdMerchant); tr.appendChild(tdCat); tr.appendChild(tdAmt); tr.appendChild(tdRemark);
+    tbody.appendChild(tr);
+  });
+  document.getElementById("txnCount").textContent = spendTxns.length + " transactions in this range";
+}
+
+function updateRangeLabel(spendTxns){
+  if(spendTxns.length===0){ document.getElementById("filterRangeLabel").textContent = "No data in range"; return; }
+  const dates = spendTxns.map(t=>t.date).sort();
+  document.getElementById("filterRangeLabel").textContent = dates[0] + " → " + dates[dates.length-1];
+}
+
+function renderAll(){
+  const filtered = getFilteredTxns();
+  renderAggregates(filtered);
+  renderTable(filtered);
+  updateRangeLabel(filtered);
 }
 
 /* ---------- CSV upload (very simple parser: date,merchant,amount columns expected) ---------- */
@@ -470,19 +658,23 @@ document.getElementById("csvInput").addEventListener("change", function(e){
         return;
       }
       const rows = lines.slice(1).map(l=>l.split(","));
-      const txns = rows.filter(r=>r.length>Math.max(dateIdx,merchantIdx,amountIdx)).map(r=>{
+      const txns = rows.filter(r=>r.length>Math.max(dateIdx,merchantIdx,amountIdx)).map((r,i)=>{
         const amount = parseFloat(r[amountIdx].replace(/[^0-9.\-]/g,""));
         const merchant = r[merchantIdx].trim();
         return {
+          id:i,
           date:r[dateIdx].trim(),
           merchant,
           amount: Math.abs(amount),
-          category: amount<0 && /salary|payroll|income/i.test(merchant) ? "income" : classify(merchant)
+          category: amount<0 && /salary|payroll|income/i.test(merchant) ? "income" : classify(merchant),
+          remark:""
         };
       }).filter(t=>!isNaN(t.amount));
-      currentTxns = txns;
+      allTxns = txns;
+      filterMonth = null; filterWeek = null; filterFrom = null; filterTo = null;
       document.getElementById("uploadLabel").textContent = `Showing your uploaded data: ${file.name} (${txns.length} rows). Categories are auto-guessed — check they look right.`;
-      render();
+      buildFilterControls();
+      renderAll();
     }catch(err){
       alert("That file didn't load properly. Still showing your previous data.");
     }
@@ -491,14 +683,17 @@ document.getElementById("csvInput").addEventListener("change", function(e){
 });
 
 document.getElementById("resetBtn").addEventListener("click", function(){
-  currentIncome = SAMPLE_INCOME;
-  currentTxns = SAMPLE_TXNS.map(([date,merchant,amount,cat])=>({date,merchant,amount,category:cat}));
+  loadSample();
+  filterMonth = null; filterWeek = null; filterFrom = null; filterTo = null;
   document.getElementById("uploadLabel").textContent = "Currently showing sample data. Upload your own CSV export to replace it.";
   document.getElementById("csvInput").value = "";
-  render();
+  buildFilterControls();
+  renderAll();
 });
 
-render();
+loadSample();
+buildFilterControls();
+renderAll();
 </script>
 </body>
 </html>
