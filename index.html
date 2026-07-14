@@ -224,10 +224,10 @@
 
   <div class="upload-bar">
     <div>
-      <div class="label" id="uploadLabel">Currently showing sample data. Upload your own CSV export to replace it.</div>
+      <div class="label" id="uploadLabel">Currently showing sample data. Upload your own CSV export(s) to replace it — select multiple files (e.g. one per bank) and they'll be combined.</div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;">
-      <input type="file" id="csvInput" accept=".csv">
+      <input type="file" id="csvInput" accept=".csv" multiple>
       <button class="btn secondary" id="resetBtn">Use sample data</button>
     </div>
   </div>
@@ -713,48 +713,79 @@ function renderAll(){
 }
 
 /* ---------- CSV upload (very simple parser: date,merchant,amount columns expected) ---------- */
-document.getElementById("csvInput").addEventListener("change", function(e){
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(evt){
+function readFileAsText(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = evt=>resolve(evt.target.result);
+    reader.onerror = ()=>reject(new Error("could not read file"));
+    reader.readAsText(file);
+  });
+}
+
+function parseCsvText(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim().length>0);
+  if(lines.length<2) return null;
+  const header = lines[0].split(",").map(h=>h.trim().toLowerCase());
+  const dateIdx = header.findIndex(h=>h.includes("date"));
+  const merchantIdx = header.findIndex(h=>h.includes("merchant")||h.includes("description")||h.includes("name"));
+  const amountIdx = header.findIndex(h=>h.includes("amount")||h.includes("value"));
+  if(dateIdx===-1||merchantIdx===-1||amountIdx===-1) return null;
+  const rows = lines.slice(1).map(l=>l.split(","));
+  return rows.filter(r=>r.length>Math.max(dateIdx,merchantIdx,amountIdx)).map(r=>{
+    const amount = parseFloat(r[amountIdx].replace(/[^0-9.\-]/g,""));
+    const merchant = r[merchantIdx].trim();
+    const isIncome = amount<0 && /salary|payroll|income/i.test(merchant);
+    const guess = isIncome ? {category:"income",subcategory:"General"} : classify(merchant);
+    return {
+      date:r[dateIdx].trim(),
+      merchant,
+      amount: Math.abs(amount),
+      category: guess.category,
+      subcategory: guess.subcategory,
+      remark:""
+    };
+  }).filter(t=>!isNaN(t.amount));
+}
+
+document.getElementById("csvInput").addEventListener("change", async function(e){
+  const files = Array.from(e.target.files);
+  if(files.length===0) return;
+
+  let combined = [];
+  let loaded = [];
+  let failed = [];
+
+  for(const file of files){
     try{
-      const text = evt.target.result;
-      const lines = text.split(/\r?\n/).filter(l=>l.trim().length>0);
-      const header = lines[0].split(",").map(h=>h.trim().toLowerCase());
-      const dateIdx = header.findIndex(h=>h.includes("date"));
-      const merchantIdx = header.findIndex(h=>h.includes("merchant")||h.includes("description")||h.includes("name"));
-      const amountIdx = header.findIndex(h=>h.includes("amount")||h.includes("value"));
-      if(dateIdx===-1||merchantIdx===-1||amountIdx===-1){
-        alert("Couldn't find date, merchant/description, and amount columns. Keeping the current data.");
-        return;
+      const text = await readFileAsText(file);
+      const txns = parseCsvText(text);
+      if(!txns){
+        failed.push(file.name);
+        continue;
       }
-      const rows = lines.slice(1).map(l=>l.split(","));
-      const txns = rows.filter(r=>r.length>Math.max(dateIdx,merchantIdx,amountIdx)).map((r,i)=>{
-        const amount = parseFloat(r[amountIdx].replace(/[^0-9.\-]/g,""));
-        const merchant = r[merchantIdx].trim();
-        const isIncome = amount<0 && /salary|payroll|income/i.test(merchant);
-        const guess = isIncome ? {category:"income",subcategory:"General"} : classify(merchant);
-        return {
-          id:i,
-          date:r[dateIdx].trim(),
-          merchant,
-          amount: Math.abs(amount),
-          category: guess.category,
-          subcategory: guess.subcategory,
-          remark:""
-        };
-      }).filter(t=>!isNaN(t.amount));
-      allTxns = txns;
-      filterMonth = null; filterWeek = null; filterFrom = null; filterTo = null;
-      document.getElementById("uploadLabel").textContent = `Showing your uploaded data: ${file.name} (${txns.length} rows). Categories are auto-guessed — check they look right.`;
-      buildFilterControls();
-      renderAll();
+      combined = combined.concat(txns);
+      loaded.push(`${file.name} (${txns.length} rows)`);
     }catch(err){
-      alert("That file didn't load properly. Still showing your previous data.");
+      failed.push(file.name);
     }
-  };
-  reader.readAsText(file);
+  }
+
+  if(combined.length===0){
+    alert("Couldn't read any of those files — check each has date, merchant/description, and amount columns. Keeping the current data.");
+    return;
+  }
+
+  combined.forEach((t,i)=>{ t.id = i; });
+  allTxns = combined;
+  filterMonth = null; filterWeek = null; filterFrom = null; filterTo = null;
+
+  let label = loaded.length>1
+    ? `Combined ${loaded.length} files: ${loaded.join(", ")}. Total ${combined.length} transactions.`
+    : `Showing your uploaded data: ${loaded[0]}.`;
+  if(failed.length>0) label += ` Skipped (couldn't find date/merchant/amount columns): ${failed.join(", ")}.`;
+  document.getElementById("uploadLabel").textContent = label + " Categories are auto-guessed — check they look right.";
+  buildFilterControls();
+  renderAll();
 });
 
 document.getElementById("resetBtn").addEventListener("click", function(){
