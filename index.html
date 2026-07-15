@@ -114,6 +114,22 @@
   .card .k{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
   .card .v{font-size:1.4rem;font-weight:700;}
   .card .sub{font-size:.78rem;color:var(--muted);margin-top:4px;}
+  .income-edit-wrap{display:flex;align-items:center;gap:2px;}
+  .income-input{
+    width:100%;
+    font-size:1.4rem;
+    font-weight:700;
+    font-family:inherit;
+    color:var(--ink);
+    border:1px solid transparent;
+    border-radius:6px;
+    padding:2px 4px;
+    background:transparent;
+    -moz-appearance:textfield;
+  }
+  .income-input::-webkit-outer-spin-button, .income-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  .income-input:hover{border-color:var(--line);}
+  .income-input:focus{outline:none;border-color:var(--mid);background:#fff;}
 
   section{
     background:var(--card);
@@ -270,8 +286,10 @@
   <div class="cards">
     <div class="card">
       <div class="k">Monthly income</div>
-      <div class="v" id="incomeVal">£0</div>
-      <div class="sub">baseline used for all views</div>
+      <div class="v income-edit-wrap">
+        <span>£</span><input type="number" id="incomeInput" class="income-input" min="1" step="1" inputmode="numeric">
+      </div>
+      <div class="sub">your figure — click to edit, used as the baseline for all views</div>
     </div>
     <div class="card">
       <div class="k">Total spent</div>
@@ -460,7 +478,12 @@ const SAMPLE_TXNS = [
   ["2026-06-30","Classpass",29.99,"flexible","General"],
 ];
 
+const INCOME_KEY = "money_dashboard_income_v1";
 let currentIncome = SAMPLE_INCOME;
+try{
+  const savedIncome = localStorage.getItem(INCOME_KEY);
+  if(savedIncome){ const n = parseFloat(savedIncome); if(!isNaN(n) && n>0) currentIncome = n; }
+}catch(e){}
 let allTxns = [];
 let filterMode = "month";
 let filterMonth = null;
@@ -472,7 +495,6 @@ let expandedCats = new Set(["essential","discretionary"]);
 function loadSample(){
   allTxns = SAMPLE_TXNS.map(([date,merchant,amount,cat,sub],i)=>({id:i,date,merchant,amount,category:cat,subcategory:sub,remark:""}));
   applyOverrides(allTxns);
-  currentIncome = SAMPLE_INCOME;
 }
 
 /* ---------- date helpers ---------- */
@@ -578,7 +600,8 @@ function renderAggregates(spendTxns){
   const totalSpend = spendTxns.reduce((s,t)=>s+t.amount,0);
   const saveInvest = spendTxns.filter(t=>t.category==="saving"||t.category==="investment").reduce((s,t)=>s+t.amount,0);
 
-  document.getElementById("incomeVal").textContent = fmt0(currentIncome);
+  const incomeInput = document.getElementById("incomeInput");
+  if(document.activeElement !== incomeInput) incomeInput.value = Math.round(currentIncome);
   document.getElementById("spendVal").textContent = fmt0(totalSpend);
   document.getElementById("spendPct").textContent = Math.round(totalSpend/currentIncome*100) + "% of income";
   document.getElementById("saveVal").textContent = fmt0(saveInvest);
@@ -852,6 +875,18 @@ document.getElementById("selectAllCheckbox").addEventListener("change", function
 document.getElementById("txnSearch").addEventListener("input", function(){
   searchQuery = this.value.trim();
   refreshTable();
+});
+
+document.getElementById("incomeInput").addEventListener("input", function(){
+  const val = parseFloat(this.value);
+  if(!isNaN(val) && val>0){
+    currentIncome = val;
+    try{ localStorage.setItem(INCOME_KEY, String(currentIncome)); }catch(e){}
+    renderAggregates(getFilteredTxns());
+  }
+});
+document.getElementById("incomeInput").addEventListener("blur", function(){
+  this.value = Math.round(currentIncome);
 });
 
 document.getElementById("bulkApplyBtn").addEventListener("click", function(){
