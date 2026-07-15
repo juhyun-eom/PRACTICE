@@ -209,6 +209,17 @@
   }
   .table-wrap{max-height:380px;overflow-y:auto;}
   .note{font-size:.78rem;color:var(--muted);margin-top:10px;}
+  .search-input{
+    width:100%;
+    padding:9px 12px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    font-size:.85rem;
+    color:var(--ink);
+    background:#fff;
+    margin-bottom:12px;
+  }
+  .search-input:focus{outline:none;border-color:var(--mid);}
   .bulk-bar{
     display:none;
     align-items:center;
@@ -304,6 +315,7 @@
   <section>
     <h2>All transactions</h2>
     <p class="desc" id="txnCount">0 transactions in this range</p>
+    <input type="text" id="txnSearch" class="search-input" placeholder="Search merchant name… (e.g. Netflix)">
     <div class="bulk-bar" id="bulkBar">
       <span id="bulkCount">0 selected</span>
       <select id="bulkCategorySelect"></select>
@@ -675,6 +687,18 @@ function cutRow(title,desc,save){
 }
 
 let selectedIds = new Set();
+let searchQuery = "";
+
+function getVisibleTxns(){
+  const base = getFilteredTxns();
+  if(!searchQuery) return base;
+  const q = searchQuery.toLowerCase();
+  return base.filter(t=>t.merchant.toLowerCase().includes(q));
+}
+
+function refreshTable(){
+  renderTable(getVisibleTxns());
+}
 
 function updateBulkBar(){
   const bar = document.getElementById("bulkBar");
@@ -698,8 +722,8 @@ function renderTable(spendTxns){
     rowCb.addEventListener("change",()=>{
       if(rowCb.checked) selectedIds.add(t.id); else selectedIds.delete(t.id);
       updateBulkBar();
-      const filtered = getFilteredTxns();
-      const allSelected = filtered.length>0 && filtered.every(x=>selectedIds.has(x.id));
+      const visible = getVisibleTxns();
+      const allSelected = visible.length>0 && visible.every(x=>selectedIds.has(x.id));
       const selectAll = document.getElementById("selectAllCheckbox");
       if(selectAll) selectAll.checked = allSelected;
     });
@@ -770,7 +794,7 @@ function renderTable(spendTxns){
     tr.appendChild(tdSelect); tr.appendChild(tdDate); tr.appendChild(tdMerchant); tr.appendChild(tdCat); tr.appendChild(tdSub); tr.appendChild(tdAmt); tr.appendChild(tdRemark);
     tbody.appendChild(tr);
   });
-  document.getElementById("txnCount").textContent = spendTxns.length + " transactions in this range";
+  document.getElementById("txnCount").textContent = spendTxns.length + " transaction" + (spendTxns.length===1?"":"s") + (searchQuery ? ` matching "${searchQuery}"` : " in this range");
 
   const selectAll = document.getElementById("selectAllCheckbox");
   const allSelected = spendTxns.length>0 && spendTxns.every(t=>selectedIds.has(t.id));
@@ -786,9 +810,12 @@ function updateRangeLabel(spendTxns){
 
 function renderAll(){
   selectedIds.clear();
+  searchQuery = "";
+  const searchBox = document.getElementById("txnSearch");
+  if(searchBox) searchBox.value = "";
   const filtered = getFilteredTxns();
   renderAggregates(filtered);
-  renderTable(filtered);
+  renderTable(getVisibleTxns());
   updateRangeLabel(filtered);
 }
 
@@ -815,10 +842,16 @@ function buildBulkControls(){
 }
 
 document.getElementById("selectAllCheckbox").addEventListener("change", function(){
-  const filtered = getFilteredTxns();
-  if(this.checked){ filtered.forEach(t=>selectedIds.add(t.id)); }
-  else { selectedIds.clear(); }
-  renderTable(filtered);
+  const visible = getVisibleTxns();
+  if(this.checked){ visible.forEach(t=>selectedIds.add(t.id)); }
+  else { visible.forEach(t=>selectedIds.delete(t.id)); }
+  updateBulkBar();
+  renderTable(visible);
+});
+
+document.getElementById("txnSearch").addEventListener("input", function(){
+  searchQuery = this.value.trim();
+  refreshTable();
 });
 
 document.getElementById("bulkApplyBtn").addEventListener("click", function(){
