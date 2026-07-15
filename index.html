@@ -209,6 +209,20 @@
   }
   .table-wrap{max-height:380px;overflow-y:auto;}
   .note{font-size:.78rem;color:var(--muted);margin-top:10px;}
+  .bulk-bar{
+    display:none;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    background:var(--pale-tint);
+    border-radius:10px;
+    padding:10px 14px;
+    margin-bottom:12px;
+  }
+  .bulk-bar #bulkCount{font-size:.82rem;font-weight:700;color:var(--dark);white-space:nowrap;}
+  .bulk-bar select{padding:6px 10px;border-radius:8px;border:1px solid var(--line);font-size:.82rem;background:#fff;}
+  .bulk-bar .btn{padding:7px 12px;font-size:.8rem;}
+  td.select-col, th.select-col{width:30px;}
 </style>
 </head>
 <body>
@@ -290,9 +304,16 @@
   <section>
     <h2>All transactions</h2>
     <p class="desc" id="txnCount">0 transactions in this range</p>
+    <div class="bulk-bar" id="bulkBar">
+      <span id="bulkCount">0 selected</span>
+      <select id="bulkCategorySelect"></select>
+      <select id="bulkSubSelect"></select>
+      <button class="btn" id="bulkApplyBtn">Apply to selected</button>
+      <button class="btn secondary" id="bulkClearBtn">Clear selection</button>
+    </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Subcategory</th><th>Amount</th><th>Remarks</th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="selectAllCheckbox"></th><th>Date</th><th>Merchant</th><th>Category</th><th>Subcategory</th><th>Amount</th><th>Remarks</th></tr></thead>
         <tbody id="txnBody"></tbody>
       </table>
     </div>
@@ -653,11 +674,36 @@ function cutRow(title,desc,save){
     </div>`;
 }
 
+let selectedIds = new Set();
+
+function updateBulkBar(){
+  const bar = document.getElementById("bulkBar");
+  const n = selectedIds.size;
+  bar.style.display = n>0 ? "flex" : "none";
+  document.getElementById("bulkCount").textContent = n + " selected";
+}
+
 function renderTable(spendTxns){
   const tbody = document.getElementById("txnBody");
   tbody.innerHTML = "";
   spendTxns.slice().sort((a,b)=>a.date<b.date?1:-1).forEach(t=>{
     const tr = document.createElement("tr");
+
+    const tdSelect = document.createElement("td");
+    tdSelect.className = "select-col";
+    const rowCb = document.createElement("input");
+    rowCb.type = "checkbox";
+    rowCb.className = "row-select";
+    rowCb.checked = selectedIds.has(t.id);
+    rowCb.addEventListener("change",()=>{
+      if(rowCb.checked) selectedIds.add(t.id); else selectedIds.delete(t.id);
+      updateBulkBar();
+      const filtered = getFilteredTxns();
+      const allSelected = filtered.length>0 && filtered.every(x=>selectedIds.has(x.id));
+      const selectAll = document.getElementById("selectAllCheckbox");
+      if(selectAll) selectAll.checked = allSelected;
+    });
+    tdSelect.appendChild(rowCb);
 
     const tdDate = document.createElement("td");
     tdDate.textContent = t.date;
@@ -721,10 +767,15 @@ function renderTable(spendTxns){
     input.addEventListener("change",()=>{ t.remark = input.value; });
     tdRemark.appendChild(input);
 
-    tr.appendChild(tdDate); tr.appendChild(tdMerchant); tr.appendChild(tdCat); tr.appendChild(tdSub); tr.appendChild(tdAmt); tr.appendChild(tdRemark);
+    tr.appendChild(tdSelect); tr.appendChild(tdDate); tr.appendChild(tdMerchant); tr.appendChild(tdCat); tr.appendChild(tdSub); tr.appendChild(tdAmt); tr.appendChild(tdRemark);
     tbody.appendChild(tr);
   });
   document.getElementById("txnCount").textContent = spendTxns.length + " transactions in this range";
+
+  const selectAll = document.getElementById("selectAllCheckbox");
+  const allSelected = spendTxns.length>0 && spendTxns.every(t=>selectedIds.has(t.id));
+  selectAll.checked = allSelected;
+  updateBulkBar();
 }
 
 function updateRangeLabel(spendTxns){
@@ -734,11 +785,59 @@ function updateRangeLabel(spendTxns){
 }
 
 function renderAll(){
+  selectedIds.clear();
   const filtered = getFilteredTxns();
   renderAggregates(filtered);
   renderTable(filtered);
   updateRangeLabel(filtered);
 }
+
+/* ---------- bulk edit ---------- */
+function buildBulkControls(){
+  const catSel = document.getElementById("bulkCategorySelect");
+  const subSel = document.getElementById("bulkSubSelect");
+  catSel.innerHTML = "";
+  Object.entries(CATS).forEach(([key,def])=>{
+    const opt = document.createElement("option");
+    opt.value = key; opt.textContent = def.label;
+    catSel.appendChild(opt);
+  });
+  function fillBulkSub(){
+    subSel.innerHTML = "";
+    (SUBCATS[catSel.value]||["General"]).forEach(sub=>{
+      const opt = document.createElement("option");
+      opt.value = sub; opt.textContent = sub;
+      subSel.appendChild(opt);
+    });
+  }
+  catSel.addEventListener("change", fillBulkSub);
+  fillBulkSub();
+}
+
+document.getElementById("selectAllCheckbox").addEventListener("change", function(){
+  const filtered = getFilteredTxns();
+  if(this.checked){ filtered.forEach(t=>selectedIds.add(t.id)); }
+  else { selectedIds.clear(); }
+  renderTable(filtered);
+});
+
+document.getElementById("bulkApplyBtn").addEventListener("click", function(){
+  if(selectedIds.size===0) return;
+  const cat = document.getElementById("bulkCategorySelect").value;
+  const sub = document.getElementById("bulkSubSelect").value;
+  allTxns.forEach(t=>{
+    if(selectedIds.has(t.id)){
+      t.category = cat;
+      t.subcategory = sub;
+      setOverride(t.merchant, cat, sub);
+    }
+  });
+  renderAll();
+});
+
+document.getElementById("bulkClearBtn").addEventListener("click", function(){
+  renderAll();
+});
 
 /* ---------- CSV upload (very simple parser: date,merchant,amount columns expected) ---------- */
 function readFileAsText(file){
@@ -929,6 +1028,7 @@ document.getElementById("resetBtn").addEventListener("click", function(){
 
 loadSample();
 buildFilterControls();
+buildBulkControls();
 renderAll();
 </script>
 </body>
