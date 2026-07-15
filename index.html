@@ -343,7 +343,32 @@ function classify(merchant){
   for(const [re,cat,sub] of RULES){
     if(re.test(merchant)) return {category:cat, subcategory:sub};
   }
-  return {category:"flexible", subcategory:"General"};
+  // Unrecognised merchants are usually a restaurant or shop we just don't have a rule for.
+  return {category:"discretionary", subcategory:"Other"};
+}
+
+/* ---------- remembered corrections (persisted in this browser only) ---------- */
+const OVERRIDES_KEY = "money_dashboard_overrides_v1";
+let overrides = {};
+try { overrides = JSON.parse(localStorage.getItem(OVERRIDES_KEY) || "{}"); } catch(e){ overrides = {}; }
+
+function normMerchant(m){ return (m||"").trim().toUpperCase(); }
+
+function saveOverrides(){
+  try{ localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides)); }catch(e){}
+}
+
+function setOverride(merchant, category, subcategory){
+  overrides[normMerchant(merchant)] = {category, subcategory};
+  saveOverrides();
+}
+
+function applyOverrides(txns){
+  txns.forEach(t=>{
+    const saved = overrides[normMerchant(t.merchant)];
+    if(saved){ t.category = saved.category; t.subcategory = saved.subcategory; }
+  });
+  return txns;
 }
 
 /* ---------- sample data (invented, realistic UK current-account export) ---------- */
@@ -413,6 +438,7 @@ let expandedCats = new Set(["essential","discretionary"]);
 
 function loadSample(){
   allTxns = SAMPLE_TXNS.map(([date,merchant,amount,cat,sub],i)=>({id:i,date,merchant,amount,category:cat,subcategory:sub,remark:""}));
+  applyOverrides(allTxns);
   currentIncome = SAMPLE_INCOME;
 }
 
@@ -674,10 +700,12 @@ function renderTable(spendTxns){
       t.category = sel.value;
       sel.style.background = CATS[t.category].color;
       fillSubOptions();
+      setOverride(t.merchant, t.category, t.subcategory);
       renderAggregates(getFilteredTxns());
     });
     subSel.addEventListener("change",()=>{
       t.subcategory = subSel.value;
+      setOverride(t.merchant, t.category, t.subcategory);
       renderAggregates(getFilteredTxns());
     });
 
@@ -830,7 +858,7 @@ function parseCsvText(text){
       category = "income"; subcategory = "General";
     } else {
       const guess = classify(merchant);
-      if(guess.category==="flexible" && guess.subcategory==="General" && BANK_CATEGORY_MAP[bankCat]){
+      if(guess.category==="discretionary" && guess.subcategory==="Other" && BANK_CATEGORY_MAP[bankCat]){
         [category,subcategory] = BANK_CATEGORY_MAP[bankCat];
       } else {
         category = guess.category; subcategory = guess.subcategory;
@@ -877,6 +905,7 @@ document.getElementById("csvInput").addEventListener("change", async function(e)
   }
 
   combined.forEach((t,i)=>{ t.id = i; });
+  applyOverrides(combined);
   allTxns = combined;
   filterMonth = null; filterWeek = null; filterFrom = null; filterTo = null;
 
